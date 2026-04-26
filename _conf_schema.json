@@ -50,14 +50,13 @@
   },
   "custom_commands": {
     "description": "自定义命令映射",
-    "type": "object",
-    "default": {
-      "猫猫": "cat",
-      "二次元": "anime",
-      "风景": "scenery"
-    },
-    "hint": "命令名 -> URL 后缀。如 /猫猫 请求 {api_base_url}?tag=cat",
-    "items": {}
+    "type": "list",
+    "default": [
+      "猫猫:cat",
+      "二次元:anime",
+      "风景:scenery"
+    ],
+    "hint": "命令名:URL后缀。如 猫猫:cat 请求 {api_base_url}?tag=cat"
   },
   "request_timeout": {
     "description": "API 请求超时时间（秒）",

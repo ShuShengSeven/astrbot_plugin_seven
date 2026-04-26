@@ -163,11 +163,12 @@ class SevenPlugin(Star):
         return event.image_result(image_url)
 
     async def _match_custom_command(self, message: str) -> str:
-        """匹配自定义命令并返回对应的 URL 后缀"""
-        custom_commands = self.config.get("custom_commands", {})
-        for cmd_name, suffix in custom_commands.items():
-            if f"/{cmd_name}" in message:
-                return suffix
+        custom_commands = self.config.get("custom_commands", [])
+        for item in custom_commands:
+            if ":" in item:
+                cmd_name, suffix = item.split(":", 1)
+                if f"/{cmd_name}" in message:
+                    return suffix
         return ""
 
     async def terminate(self):
