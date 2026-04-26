@@ -49,21 +49,21 @@
     "hint": "群聊 ID 列表"
   },
   "custom_commands_prefix": {
-    "description": "带/前缀的自定义命令（如 /猫猫）",
+    "description": "带/前缀的自定义命令（如 /小猫）",
     "type": "list",
     "default": [
-      "猫猫:cat",
-      "二次元:anime"
+      "小猫 https://api.example.com/cat.jpg",
+      "二次元 https://api.example.com/anime.jpg"
     ],
-    "hint": "格式：命令名:URL后缀。如 /猫猫 请求 {api_base_url}?tag=cat"
+    "hint": "格式：触发词 完整URL。如 /小猫 请求 https://api.example.com/cat.jpg"
   },
   "custom_commands_keyword": {
     "description": "关键词触发的自定义命令（自动检测消息内容）",
     "type": "list",
     "default": [
-      "风景:scenery"
+      "风景 https://api.example.com/scenery.jpg"
     ],
-    "hint": "格式：关键词:URL后缀。消息中包含关键词时自动触发"
+    "hint": "格式：关键词 完整URL。消息中包含关键词时自动请求该URL"
   },
   "request_timeout": {
     "description": "API 请求超时时间（秒）",

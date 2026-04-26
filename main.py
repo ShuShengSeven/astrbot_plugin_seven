@@ -157,10 +157,13 @@ class SevenPlugin(Star):
         if not self._check_group_allowed(str(group_id)):
             return event.plain_result("该群不在允许范围内")
         message = event.message_str
-        suffix = self._match_prefix_command(message)
-        if not suffix:
-            suffix = self._match_keyword_command(message)
-        image_url = await self._fetch_image_url(suffix)
+        custom_url = self._match_prefix_command(message)
+        if not custom_url:
+            custom_url = self._match_keyword_command(message)
+        if custom_url:
+            image_url = await self._fetch_full_url(custom_url)
+        else:
+            image_url = await self._fetch_image_url()
         if image_url is None:
             return event.plain_result("获取图片失败，请稍后重试")
         return event.image_result(image_url)
@@ -168,22 +171,46 @@ class SevenPlugin(Star):
     def _match_prefix_command(self, message: str) -> str:
         custom_commands = self.config.get("custom_commands_prefix", [])
         for item in custom_commands:
-            if ":" in item:
-                cmd_name, suffix = item.split(":", 1)
+            parts = item.split(None, 1)
+            if len(parts) == 2:
+                cmd_name, url = parts
                 if f"/{cmd_name}" in message:
-                    logger.info(f"随机图插件: 匹配到前缀命令 /{cmd_name}")
-                    return suffix
+                    logger.info(f"随机图插件: 匹配到前缀命令 /{cmd_name} -> {url}")
+                    return url
         return ""
 
     def _match_keyword_command(self, message: str) -> str:
         custom_commands = self.config.get("custom_commands_keyword", [])
         for item in custom_commands:
-            if ":" in item:
-                keyword, suffix = item.split(":", 1)
+            parts = item.split(None, 1)
+            if len(parts) == 2:
+                keyword, url = parts
                 if keyword in message:
-                    logger.info(f"随机图插件: 匹配到关键词 {keyword}")
-                    return suffix
+                    logger.info(f"随机图插件: 匹配到关键词 {keyword} -> {url}")
+                    return url
         return ""
+
+    async def _fetch_full_url(self, url: str) -> str | None:
+        timeout = self.config.get("request_timeout", 15)
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, timeout=aiohttp.ClientTimeout(total=timeout)) as resp:
+                    if resp.status == 200:
+                        content_type = resp.headers.get("Content-Type", "")
+                        if "image" in content_type:
+                            return url
+                        text = await resp.text()
+                        text = text.strip()
+                        if text.startswith("http"):
+                            return text
+                        logger.warning(f"随机图插件: API 返回非图片内容: {text[:200]}")
+                        return text
+                    logger.warning(f"随机图插件: API 返回状态码 {resp.status}")
+        except asyncio.TimeoutError:
+            logger.error(f"随机图插件: API 请求超时 ({timeout}s)")
+        except Exception:
+            logger.error("随机图插件: API 请求异常", exc_info=True)
+        return None
 
     async def terminate(self):
         for task in self.scheduled_tasks:
