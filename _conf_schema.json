@@ -48,15 +48,22 @@
     "default": [],
     "hint": "群聊 ID 列表"
   },
-  "custom_commands": {
-    "description": "自定义命令映射",
+  "custom_commands_prefix": {
+    "description": "带/前缀的自定义命令（如 /猫猫）",
     "type": "list",
     "default": [
       "猫猫:cat",
-      "二次元:anime",
+      "二次元:anime"
+    ],
+    "hint": "格式：命令名:URL后缀。如 /猫猫 请求 {api_base_url}?tag=cat"
+  },
+  "custom_commands_keyword": {
+    "description": "关键词触发的自定义命令（自动检测消息内容）",
+    "type": "list",
+    "default": [
       "风景:scenery"
     ],
-    "hint": "命令名:URL后缀。如 猫猫:cat 请求 {api_base_url}?tag=cat"
+    "hint": "格式：关键词:URL后缀。消息中包含关键词时自动触发"
   },
   "request_timeout": {
     "description": "API 请求超时时间（秒）",
