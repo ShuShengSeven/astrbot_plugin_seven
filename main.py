@@ -69,12 +69,11 @@ class SevenPlugin(Star):
         target_groups = self._get_scheduled_target_groups()
         for umo in target_groups:
             try:
-                await self._fetch_and_send_image(umo)
+                await self._fetch_and_send(umo, self.config.get("api_base_url", ""))
             except Exception:
                 logger.error(f"随机图插件: 向 {umo} 推送图片失败", exc_info=True)
 
     def _get_scheduled_target_groups(self) -> list:
-        """获取定时推送的目标群聊列表（基于当前活跃会话）"""
         platforms = self.context.platform_manager.get_insts()
         target_umos = []
         for platform in platforms:
@@ -105,92 +104,7 @@ class SevenPlugin(Star):
             return group_id in whitelist
         return True
 
-    async def _fetch_image_url(self, suffix: str = "") -> str | None:
-        base_url = self.config.get("api_base_url", "").rstrip("/")
-        if suffix:
-            url = f"{base_url}?{suffix}" if "?" not in suffix else f"{base_url}{'&' if '?' in base_url else '?'}{suffix}" if suffix.startswith("&") else f"{base_url}?{suffix}"
-        else:
-            url = base_url
-        timeout = self.config.get("request_timeout", 15)
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, timeout=aiohttp.ClientTimeout(total=timeout)) as resp:
-                    if resp.status == 200:
-                        content_type = resp.headers.get("Content-Type", "")
-                        if "image" in content_type:
-                            return url
-                        text = await resp.text()
-                        text = text.strip()
-                        if text.startswith("http"):
-                            return text
-                        if text:
-                            logger.warning(f"随机图插件: API 返回非图片内容: {text[:200]}")
-                            return text
-                    logger.warning(f"随机图插件: API 返回状态码 {resp.status}")
-        except asyncio.TimeoutError:
-            logger.error(f"随机图插件: API 请求超时 ({timeout}s)")
-        except Exception:
-            logger.error("随机图插件: API 请求异常", exc_info=True)
-        return None
-
-    async def _fetch_and_send_image(self, umo: str, suffix: str = "") -> bool:
-        image_url = await self._fetch_image_url(suffix)
-        if image_url:
-            from astrbot.api.message_components import Image
-            chain = [Image.fromURL(image_url)]
-            await self.context.send_message(umo, chain)
-            return True
-        return False
-
-    @filter.command("img")
-    async def cmd_img(self, event: AstrMessageEvent):
-        """手动触发随机图，默认不带任何后缀"""
-        yield await self._handle_manual_trigger(event)
-
-    @filter.command("来张图")
-    async def cmd_laizhangtu(self, event: AstrMessageEvent):
-        """手动触发随机图，默认不带任何后缀"""
-        yield await self._handle_manual_trigger(event)
-
-    async def _handle_manual_trigger(self, event: AstrMessageEvent) -> MessageEventResult:
-        group_id = event.message_obj.group_id or "private"
-        if not self._check_group_allowed(str(group_id)):
-            return event.plain_result("该群不在允许范围内")
-        message = event.message_str
-        custom_url = self._match_prefix_command(message)
-        if not custom_url:
-            custom_url = self._match_keyword_command(message)
-        if custom_url:
-            image_url = await self._fetch_full_url(custom_url)
-        else:
-            image_url = await self._fetch_image_url()
-        if image_url is None:
-            return event.plain_result("获取图片失败，请稍后重试")
-        return event.image_result(image_url)
-
-    def _match_prefix_command(self, message: str) -> str:
-        custom_commands = self.config.get("custom_commands_prefix", [])
-        for item in custom_commands:
-            parts = item.split(None, 1)
-            if len(parts) == 2:
-                cmd_name, url = parts
-                if f"/{cmd_name}" in message:
-                    logger.info(f"随机图插件: 匹配到前缀命令 /{cmd_name} -> {url}")
-                    return url
-        return ""
-
-    def _match_keyword_command(self, message: str) -> str:
-        custom_commands = self.config.get("custom_commands_keyword", [])
-        for item in custom_commands:
-            parts = item.split(None, 1)
-            if len(parts) == 2:
-                keyword, url = parts
-                if keyword in message:
-                    logger.info(f"随机图插件: 匹配到关键词 {keyword} -> {url}")
-                    return url
-        return ""
-
-    async def _fetch_full_url(self, url: str) -> str | None:
+    async def _request_image(self, url: str) -> str | None:
         timeout = self.config.get("request_timeout", 15)
         try:
             async with aiohttp.ClientSession() as session:
@@ -211,6 +125,65 @@ class SevenPlugin(Star):
         except Exception:
             logger.error("随机图插件: API 请求异常", exc_info=True)
         return None
+
+    async def _fetch_and_send(self, umo: str, url: str) -> bool:
+        image_url = await self._request_image(url)
+        if image_url:
+            from astrbot.api.message_components import Image
+            chain = [Image.fromURL(image_url)]
+            await self.context.send_message(umo, chain)
+            return True
+        return False
+
+    @filter.event_message_type(filter.EventMessageType.ALL)
+    async def on_all_message(self, event: AstrMessageEvent):
+        group_id = event.message_obj.group_id or "private"
+        if not self._check_group_allowed(str(group_id)):
+            return
+
+        msg = event.message_str
+        url = self._match_prefix(msg)
+        if not url:
+            url = self._match_keyword(msg)
+
+        if url:
+            result = await self._send_result(event, url)
+            if result:
+                yield result
+            event.stop_event()
+            return
+
+        if msg in ("/img", "/来张图"):
+            result = await self._send_result(event, self.config.get("api_base_url", ""))
+            if result:
+                yield result
+            event.stop_event()
+
+    async def _send_result(self, event: AstrMessageEvent, url: str) -> MessageEventResult | None:
+        image_url = await self._request_image(url)
+        if image_url is None:
+            return event.plain_result("获取图片失败，请稍后重试")
+        return event.image_result(image_url)
+
+    def _match_prefix(self, message: str) -> str:
+        for item in self.config.get("custom_commands_prefix", []):
+            parts = item.split(None, 1)
+            if len(parts) == 2:
+                cmd_name, url = parts
+                if f"/{cmd_name}" == message:
+                    logger.info(f"随机图插件: 匹配前缀命令 /{cmd_name} -> {url}")
+                    return url
+        return ""
+
+    def _match_keyword(self, message: str) -> str:
+        for item in self.config.get("custom_commands_keyword", []):
+            parts = item.split(None, 1)
+            if len(parts) == 2:
+                keyword, url = parts
+                if keyword in message:
+                    logger.info(f"随机图插件: 匹配关键词 {keyword} -> {url}")
+                    return url
+        return ""
 
     async def terminate(self):
         for task in self.scheduled_tasks:
