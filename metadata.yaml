@@ -1,0 +1,6 @@
+name: astrbot_plugin_seven
+display_name: 随机图插件
+desc: 支持定时推送与手动触发的随机图片插件，含群聊黑白名单与高度自定义配置。
+version: v1.0.0
+author: Seven
+repo: https://github.com/Seven/astrbot_plugin_seven

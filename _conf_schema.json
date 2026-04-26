@@ -1,0 +1,75 @@
+{
+  "api_base_url": {
+    "description": "随机图 API 基础地址",
+    "type": "string",
+    "default": "https://api.example.com/random",
+    "hint": "API 基础 URL，不带查询参数"
+  },
+  "schedule_mode": {
+    "description": "定时推送模式",
+    "type": "string",
+    "default": "interval",
+    "options": ["interval", "fixed_time", "off"],
+    "hint": "interval: 间隔触发; fixed_time: 定点触发; off: 关闭定时推送"
+  },
+  "schedule_interval": {
+    "description": "间隔触发的时间间隔（分钟）",
+    "type": "int",
+    "default": 60,
+    "hint": "仅在 schedule_mode 为 interval 时生效"
+  },
+  "schedule_fixed_times": {
+    "description": "定点触发的时间点列表",
+    "type": "list",
+    "default": ["08:00", "12:30", "22:00"],
+    "hint": "格式 HH:MM，24 小时制。仅在 schedule_mode 为 fixed_time 时生效"
+  },
+  "group_whitelist_enabled": {
+    "description": "是否启用群聊白名单",
+    "type": "bool",
+    "default": false,
+    "hint": "启用后，只在白名单群内生效"
+  },
+  "group_whitelist": {
+    "description": "群聊白名单",
+    "type": "list",
+    "default": [],
+    "hint": "群聊 ID 列表，为空时不过滤"
+  },
+  "group_blacklist_enabled": {
+    "description": "是否启用群聊黑名单",
+    "type": "bool",
+    "default": false,
+    "hint": "启用后，黑名单群内不生效"
+  },
+  "group_blacklist": {
+    "description": "群聊黑名单",
+    "type": "list",
+    "default": [],
+    "hint": "群聊 ID 列表"
+  },
+  "custom_commands": {
+    "description": "自定义命令映射",
+    "type": "object",
+    "default": {
+      "猫猫": "cat",
+      "二次元": "anime",
+      "风景": "scenery"
+    },
+    "hint": "命令名 -> URL 后缀。如 /猫猫 请求 {api_base_url}?tag=cat",
+    "items": {
+      "type": "string"
+    }
+  },
+  "request_timeout": {
+    "description": "API 请求超时时间（秒）",
+    "type": "int",
+    "default": 15
+  },
+  "schedule_random_offset": {
+    "description": "定时任务随机偏移秒数（0-300）",
+    "type": "int",
+    "default": 0,
+    "hint": "避免定时任务精确整点触发，增加随机延迟"
+  }
+}
