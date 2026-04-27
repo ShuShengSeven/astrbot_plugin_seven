@@ -18,6 +18,7 @@ class SevenPlugin(Star):
         self._active_umos: set[str] = set()
 
     async def initialize(self):
+        self._active_umos: set[str] = set(await self.get_kv_data("active_umos", []))
         mode = self.config.get("schedule_mode", "off")
         if mode == "interval":
             minutes = self.config.get("schedule_interval", 60)
@@ -29,6 +30,14 @@ class SevenPlugin(Star):
             self.scheduled_tasks.append(task)
             fixed_times = self.config.get("schedule_fixed_times", [])
             logger.info(f"随机图插件: 定点模式已启动，推送时间点: {fixed_times}")
+
+    async def _save_umos(self):
+        await self.put_kv_data("active_umos", list(self._active_umos))
+
+    async def _add_umo(self, umo: str):
+        if umo not in self._active_umos:
+            self._active_umos.add(umo)
+            await self._save_umos()
 
     async def _interval_loop(self, minutes: int):
         while True:
@@ -67,6 +76,9 @@ class SevenPlugin(Star):
 
     async def _do_scheduled_push(self):
         logger.info("随机图插件: 定时任务触发")
+        if not self._active_umos:
+            logger.warning("随机图插件: 没有活跃群聊，跳过推送")
+            return
         for umo in list(self._active_umos):
             group_id = umo.split(":")[-1] if ":" in umo else ""
             if not self._check_group_allowed(group_id):
@@ -122,7 +134,7 @@ class SevenPlugin(Star):
     async def cmd_img(self, event: AstrMessageEvent, sub_command: str = ""):
         umo = event.unified_msg_origin
         if umo:
-            self._active_umos.add(umo)
+            await self._add_umo(umo)
         url = self._resolve_img_command(sub_command)
         if not url:
             return
@@ -135,7 +147,7 @@ class SevenPlugin(Star):
     async def cmd_laizhangtu(self, event: AstrMessageEvent, sub_command: str = ""):
         umo = event.unified_msg_origin
         if umo:
-            self._active_umos.add(umo)
+            await self._add_umo(umo)
         url = self._resolve_img_command(sub_command)
         if not url:
             return
@@ -159,7 +171,7 @@ class SevenPlugin(Star):
 
         umo = event.unified_msg_origin
         if umo:
-            self._active_umos.add(umo)
+            await self._add_umo(umo)
 
         msg = event.message_str
         url = self._match_keyword(msg)
