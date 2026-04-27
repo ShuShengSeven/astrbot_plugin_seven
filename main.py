@@ -68,6 +68,9 @@ class SevenPlugin(Star):
     async def _do_scheduled_push(self):
         logger.info("随机图插件: 定时任务触发")
         for umo in list(self._active_umos):
+            group_id = umo.split(":")[-1] if ":" in umo else ""
+            if not self._check_group_allowed(group_id):
+                continue
             try:
                 await self._fetch_and_send(umo, self.config.get("api_base_url", ""))
             except Exception:
