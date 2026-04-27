@@ -15,6 +15,7 @@ class SevenPlugin(Star):
         super().__init__(context)
         self.config = config
         self.scheduled_tasks: list[asyncio.Task] = []
+        self._active_umos: set[str] = set()
 
     async def initialize(self):
         mode = self.config.get("schedule_mode", "off")
@@ -66,32 +67,11 @@ class SevenPlugin(Star):
 
     async def _do_scheduled_push(self):
         logger.info("随机图插件: 定时任务触发")
-        target_groups = self._get_scheduled_target_groups()
-        for umo in target_groups:
+        for umo in list(self._active_umos):
             try:
                 await self._fetch_and_send(umo, self.config.get("api_base_url", ""))
             except Exception:
                 logger.error(f"随机图插件: 向 {umo} 推送图片失败", exc_info=True)
-
-    def _get_scheduled_target_groups(self) -> list:
-        platforms = self.context.platform_manager.get_insts()
-        target_umos = []
-        for platform in platforms:
-            platform_name = getattr(platform, "platform_name", None) or platform.__class__.__name__
-            if platform_name:
-                groups = getattr(platform, "get_groups", None)
-                if callable(groups):
-                    try:
-                        group_list = groups()
-                        for g in group_list:
-                            group_id = str(g.get("group_id", ""))
-                            if self._check_group_allowed(group_id):
-                                umo = f"{platform_name}:GroupMessage:{group_id}"
-                                target_umos.append(umo)
-                    except Exception as e:
-                        logger.warning(f"随机图插件: 获取 {platform_name} 群列表失败: {e}")
-        logger.info(f"随机图插件: 定时推送目标群聊: {target_umos}")
-        return target_umos
 
     def _check_group_allowed(self, group_id: str) -> bool:
         whitelist_enabled = self.config.get("group_whitelist_enabled", False)
@@ -141,6 +121,10 @@ class SevenPlugin(Star):
         if not self._check_group_allowed(str(group_id)):
             return
 
+        umo = event.unified_msg_origin
+        if umo:
+            self._active_umos.add(umo)
+
         msg = event.message_str
         url = self._match_prefix(msg)
         if not url:
@@ -153,7 +137,8 @@ class SevenPlugin(Star):
             event.stop_event()
             return
 
-        if msg in ("/img", "/来张图"):
+        wake = self.config.get("wake_prefix", ["/"])[0] if self.config.get("wake_prefix") else "/"
+        if msg in (f"{wake}img", f"{wake}来张图"):
             result = await self._send_result(event, self.config.get("api_base_url", ""))
             if result:
                 yield result
