@@ -48,14 +48,14 @@
     "default": [],
     "hint": "群聊 ID 列表"
   },
-  "custom_commands_prefix": {
-    "description": "带/前缀的自定义命令（如 /小猫）",
+  "custom_img_sub_commands": {
+    "description": "/img 后缀命令映射（如 /img 山田凉）",
     "type": "list",
     "default": [
-      "小猫 https://api.example.com/cat.jpg",
-      "二次元 https://api.example.com/anime.jpg"
+      "山田凉 https://api.example.com/ryo.jpg",
+      "初音未来 https://api.example.com/miku.jpg"
     ],
-    "hint": "格式：触发词 完整URL。如 /小猫 请求 https://api.example.com/cat.jpg"
+    "hint": "格式：触发词 完整URL。发送 /img 山田凉 请求对应URL"
   },
   "custom_commands_keyword": {
     "description": "关键词触发的自定义命令（自动检测消息内容）",

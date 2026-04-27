@@ -126,23 +126,35 @@ class SevenPlugin(Star):
             self._active_umos.add(umo)
 
         msg = event.message_str
-        url = self._match_prefix(msg)
-        if not url:
-            url = self._match_keyword(msg)
+        wake = self.config.get("wake_prefix", ["/"])[0] if self.config.get("wake_prefix") else "/"
 
-        if url:
-            result = await self._send_result(event, url)
+        keyword_url = self._match_keyword(msg)
+        if keyword_url:
+            result = await self._send_result(event, keyword_url)
             if result:
                 yield result
             event.stop_event()
             return
 
-        wake = self.config.get("wake_prefix", ["/"])[0] if self.config.get("wake_prefix") else "/"
         if msg in (f"{wake}img", f"{wake}来张图"):
             result = await self._send_result(event, self.config.get("api_base_url", ""))
             if result:
                 yield result
             event.stop_event()
+            return
+
+        for prefix in (f"{wake}img ", f"{wake}来张图 "):
+            if msg.startswith(prefix):
+                sub = msg[len(prefix):].strip()
+                if sub:
+                    url = self._match_img_sub(sub)
+                    if url:
+                        result = await self._send_result(event, url)
+                        if result:
+                            yield result
+                        event.stop_event()
+                        return
+                break
 
     async def _send_result(self, event: AstrMessageEvent, url: str) -> MessageEventResult | None:
         image_url = await self._request_image(url)
@@ -150,13 +162,13 @@ class SevenPlugin(Star):
             return event.plain_result("获取图片失败，请稍后重试")
         return event.image_result(image_url)
 
-    def _match_prefix(self, message: str) -> str:
-        for item in self.config.get("custom_commands_prefix", []):
+    def _match_img_sub(self, sub_command: str) -> str:
+        for item in self.config.get("custom_img_sub_commands", []):
             parts = item.split(None, 1)
             if len(parts) == 2:
-                cmd_name, url = parts
-                if f"/{cmd_name}" == message:
-                    logger.info(f"随机图插件: 匹配前缀命令 /{cmd_name} -> {url}")
+                trigger, url = parts
+                if trigger == sub_command:
+                    logger.info(f"随机图插件: 匹配 /img {trigger} -> {url}")
                     return url
         return ""
 
