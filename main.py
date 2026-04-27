@@ -115,6 +115,39 @@ class SevenPlugin(Star):
             return True
         return False
 
+    @filter.command("img")
+    async def cmd_img(self, event: AstrMessageEvent, sub_command: str = ""):
+        umo = event.unified_msg_origin
+        if umo:
+            self._active_umos.add(umo)
+        url = self._resolve_img_command(sub_command)
+        if not url:
+            return
+        result = await self._send_result(event, url)
+        if result:
+            yield result
+        event.stop_event()
+
+    @filter.command("来张图")
+    async def cmd_laizhangtu(self, event: AstrMessageEvent, sub_command: str = ""):
+        umo = event.unified_msg_origin
+        if umo:
+            self._active_umos.add(umo)
+        url = self._resolve_img_command(sub_command)
+        if not url:
+            return
+        result = await self._send_result(event, url)
+        if result:
+            yield result
+        event.stop_event()
+
+    def _resolve_img_command(self, sub_command: str) -> str:
+        if sub_command:
+            mapped = self._match_img_sub(sub_command)
+            if mapped:
+                return mapped
+        return self.config.get("api_base_url", "")
+
     @filter.event_message_type(filter.EventMessageType.ALL)
     async def on_all_message(self, event: AstrMessageEvent):
         group_id = event.message_obj.group_id or "private"
@@ -126,35 +159,12 @@ class SevenPlugin(Star):
             self._active_umos.add(umo)
 
         msg = event.message_str
-        wake = self.config.get("wake_prefix", ["/"])[0] if self.config.get("wake_prefix") else "/"
-
-        keyword_url = self._match_keyword(msg)
-        if keyword_url:
-            result = await self._send_result(event, keyword_url)
+        url = self._match_keyword(msg)
+        if url:
+            result = await self._send_result(event, url)
             if result:
                 yield result
             event.stop_event()
-            return
-
-        if msg in (f"{wake}img", f"{wake}来张图"):
-            result = await self._send_result(event, self.config.get("api_base_url", ""))
-            if result:
-                yield result
-            event.stop_event()
-            return
-
-        for prefix in (f"{wake}img ", f"{wake}来张图 "):
-            if msg.startswith(prefix):
-                sub = msg[len(prefix):].strip()
-                if sub:
-                    url = self._match_img_sub(sub)
-                    if url:
-                        result = await self._send_result(event, url)
-                        if result:
-                            yield result
-                        event.stop_event()
-                        return
-                break
 
     async def _send_result(self, event: AstrMessageEvent, url: str) -> MessageEventResult | None:
         image_url = await self._request_image(url)
