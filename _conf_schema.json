@@ -1,79 +1,382 @@
 {
-  "api_base_url": {
-    "description": "随机图 API 基础地址",
-    "type": "string",
-    "default": "https://api.example.com/random",
-    "hint": "API 基础 URL，不带查询参数"
-  },
-  "schedule_mode": {
-    "description": "定时推送模式",
-    "type": "string",
-    "default": "interval",
-    "options": ["interval", "fixed_time", "off"],
-    "hint": "interval: 间隔触发; fixed_time: 定点触发; off: 关闭定时推送"
-  },
-  "schedule_interval": {
-    "description": "间隔触发的时间间隔（分钟）",
-    "type": "int",
-    "default": 60,
-    "hint": "仅在 schedule_mode 为 interval 时生效"
-  },
-  "schedule_fixed_times": {
-    "description": "定点触发的时间点列表",
-    "type": "list",
-    "default": ["08:00", "12:30", "22:00"],
-    "hint": "格式 HH:MM，24 小时制。仅在 schedule_mode 为 fixed_time 时生效"
-  },
-  "group_whitelist_enabled": {
-    "description": "是否启用群聊白名单",
+  "enabled": {
     "type": "bool",
-    "default": false,
-    "hint": "启用后，只在白名单群内生效"
+    "description": "插件总开关",
+    "hint": "关闭后插件不会执行自动巡检，管理命令仍可保留用于排查。",
+    "default": true
   },
-  "group_whitelist": {
-    "description": "群聊白名单",
-    "type": "list",
-    "default": [],
-    "hint": "群聊 ID 列表，为空时不过滤"
-  },
-  "group_blacklist_enabled": {
-    "description": "是否启用群聊黑名单",
+  "dev_mode": {
     "type": "bool",
+    "description": "开发模式",
+    "hint": "开启后输出 debug 级调试日志，包括取帖、过滤、审核、移帖、记录和通知过程。",
     "default": false,
-    "hint": "启用后，黑名单群内不生效"
+    "obvious_hint": true
   },
-  "group_blacklist": {
-    "description": "群聊黑名单",
-    "type": "list",
-    "default": [],
-    "hint": "群聊 ID 列表"
+  "auto_review": {
+    "type": "object",
+    "description": "自动巡检配置",
+    "items": {
+      "enabled": {
+        "type": "bool",
+        "description": "是否启用自动巡检",
+        "hint": "开启后插件会按固定时间间隔自动拉取最新帖子并执行审核。",
+        "default": true
+      },
+      "poll_interval_seconds": {
+        "type": "int",
+        "description": "自动巡检间隔秒数",
+        "default": 300,
+        "hint": "建议不要低于 60 秒，避免触发 CLI 频率限制。"
+      },
+      "fetch_count": {
+        "type": "int",
+        "description": "每轮拉取帖子数量",
+        "default": 20,
+        "hint": "插件会强制限制为最多 20 条，避免多图帖子导致模型请求体过大。"
+      },
+      "dry_run": {
+        "type": "bool",
+        "description": "仅审核和通知，不执行移动",
+        "default": true,
+        "hint": "建议第一阶段先开启，观察模型误判率。",
+        "obvious_hint": true
+      },
+      "startup_delay_seconds": {
+        "type": "int",
+        "description": "启动后首轮巡检延迟秒数",
+        "hint": "机器人刚启动时通常还在初始化网络和模型，建议保留 10 到 30 秒缓冲。",
+        "default": 15
+      }
+    }
   },
-  "custom_img_sub_commands": {
-    "description": "/img 后缀命令映射（如 /img 山田凉）",
-    "type": "list",
-    "default": [
-      "山田凉 https://api.example.com/ryo.jpg",
-      "初音未来 https://api.example.com/miku.jpg"
-    ],
-    "hint": "格式：触发词 完整URL。发送 /img 山田凉 请求对应URL"
+  "cli": {
+    "type": "object",
+    "description": "tencent-channel-cli 运行配置",
+    "items": {
+      "cli_path": {
+        "type": "string",
+        "description": "tencent-channel-cli.cmd 绝对路径",
+        "hint": "Windows 下建议填写 .cmd 路径，避免 .ps1 执行策略问题。",
+        "obvious_hint": true
+      },
+      "timeout_seconds": {
+        "type": "int",
+        "description": "普通 CLI 命令超时时间",
+        "hint": "获取帖子列表、登录状态这类普通命令的超时时间。",
+        "default": 30
+      },
+      "detail_timeout_seconds": {
+        "type": "int",
+        "description": "帖子详情命令超时时间",
+        "hint": "获取帖子详情通常比列表慢，建议比普通命令给更长时间。",
+        "default": 60
+      },
+      "min_version": {
+        "type": "string",
+        "description": "最低 CLI 版本",
+        "hint": "Skill 文档要求的最低 tencent-channel-cli 版本，低于此版本容易字段不兼容。",
+        "default": "1.0.6"
+      },
+      "check_on_startup": {
+        "type": "bool",
+        "description": "插件启动时执行 CLI 自检",
+        "hint": "会检查 CLI 是否可用、是否已登录，强烈建议保持开启。",
+        "default": true
+      },
+      "startup_check_mode": {
+        "type": "string",
+        "description": "自检失败后的处理方式",
+        "hint": "strict 表示失败就不启动自动巡检；warn_only 表示告警后继续运行；disabled 表示跳过自检。",
+        "default": "strict",
+        "options": [
+          "strict",
+          "warn_only",
+          "disabled"
+        ]
+      },
+      "auto_doctor_on_error": {
+        "type": "bool",
+        "description": "CLI 调用失败时自动执行 doctor",
+        "hint": "适合排查环境问题，但会额外增加一次 CLI 调用。",
+        "default": false
+      },
+      "rate_limit_retry_seconds": {
+        "type": "int",
+        "description": "遇到限流后等待重试秒数",
+        "hint": "Skill 文档建议遇到 153 限流后等待 70 秒再重试一次。",
+        "default": 70
+      }
+    }
   },
-  "custom_commands_keyword": {
-    "description": "关键词触发的自定义命令（自动检测消息内容）",
-    "type": "list",
-    "default": [
-      "风景 https://api.example.com/scenery.jpg"
-    ],
-    "hint": "格式：关键词 完整URL。消息中包含关键词时自动请求该URL"
+  "channel": {
+    "type": "object",
+    "description": "频道巡检范围与处理配置",
+    "items": {
+      "guild_id": {
+        "type": "string",
+        "description": "目标频道 ID",
+        "hint": "要巡检的腾讯频道 ID，不是版块 ID。",
+        "obvious_hint": true
+      },
+      "scan_strategy": {
+        "type": "string",
+        "description": "扫描策略",
+        "hint": "guild_home 表示从频道主页抓帖；per_channel 表示逐个版块抓帖。",
+        "default": "guild_home",
+        "options": [
+          "guild_home",
+          "per_channel"
+        ]
+      },
+      "feed_source_mode": {
+        "type": "string",
+        "description": "帖子来源模式",
+        "hint": "guild_latest 抓最新帖子；guild_hot 抓热门帖子；channel_timeline 抓指定版块帖子。",
+        "default": "guild_latest",
+        "options": [
+          "guild_latest",
+          "guild_hot",
+          "channel_timeline"
+        ]
+      },
+      "target_channel_ids": {
+        "type": "list",
+        "description": "需要巡检的版块 ID 列表",
+        "hint": "只有在按版块扫描，或者希望限定扫描范围时才需要填写。",
+        "default": []
+      },
+      "exclude_channel_ids": {
+        "type": "list",
+        "description": "跳过巡检的版块 ID 列表",
+        "hint": "这些版块中的帖子会被直接忽略，适合跳过公告区、存档区等无需审核的版块。",
+        "default": []
+      },
+      "fallback_channel_id": {
+        "type": "string",
+        "description": "帖子原始版块缺失时使用的兜底版块 ID",
+        "hint": "个别帖子列表数据可能缺少 channel_id，移动帖子时会退回使用这个版块 ID。",
+        "default": ""
+      },
+      "suspect_channel_id": {
+        "type": "string",
+        "description": "违规帖移动目标版块 ID",
+        "hint": "当审核命中违规且不是 dry_run 时，帖子会被移动到这里。",
+        "default": ""
+      },
+      "moderation_action": {
+        "type": "string",
+        "description": "违规帖子处理动作",
+        "hint": "notify_only 只通知；move 只移动；move_then_notify 先移动再通知。",
+        "default": "move_then_notify",
+        "options": [
+          "notify_only",
+          "move",
+          "move_then_notify"
+        ]
+      },
+      "skip_if_already_in_suspect_channel": {
+        "type": "bool",
+        "description": "已在违规区时跳过移动",
+        "hint": "开启后，已经在违规版块的帖子不会重复执行 move-feed。",
+        "default": true
+      },
+      "scan_all_when_target_empty": {
+        "type": "bool",
+        "description": "未指定版块列表时扫描整个频道主页",
+        "hint": "关闭后，如果 target_channel_ids 为空，就不会自动扩大到全频道扫描。",
+        "default": true
+      }
+    }
   },
-  "request_timeout": {
-    "description": "API 请求超时时间（秒）",
-    "type": "int",
-    "default": 15
+  "review": {
+    "type": "object",
+    "description": "审核模型配置",
+    "items": {
+      "provider_mode": {
+        "type": "string",
+        "description": "审核模型接入方式",
+        "hint": "astrbot_provider 使用 AstrBot 已配置模型；custom_openai_compatible 使用自定义 OpenAI 兼容接口。",
+        "default": "astrbot_provider",
+        "options": [
+          "astrbot_provider",
+          "custom_openai_compatible"
+        ]
+      },
+      "provider_id": {
+        "type": "string",
+        "description": "AstrBot 模型提供商",
+        "hint": "当 provider_mode 为 astrbot_provider 时，在这里选择 AstrBot 已接入的模型提供商。",
+        "_special": "select_provider",
+        "default": ""
+      },
+      "model": {
+        "type": "string",
+        "description": "审核模型名称",
+        "hint": "例如 gpt-4o-mini、gemini-1.5-flash 等；留空时通常使用提供商默认模型。",
+        "default": ""
+      },
+      "custom_base_url": {
+        "type": "string",
+        "description": "自定义兼容 OpenAI 的接口地址",
+        "hint": "只有 provider_mode 为 custom_openai_compatible 时才需要填写。",
+        "default": ""
+      },
+      "custom_api_key": {
+        "type": "string",
+        "description": "自定义接口密钥",
+        "hint": "只有 provider_mode 为 custom_openai_compatible 时才需要填写。",
+        "default": ""
+      },
+      "review_prompt": {
+        "type": "text",
+        "description": "审核提示词",
+        "hint": "这里决定模型如何判定违规内容，建议根据你的社区规则持续迭代。",
+        "editor_mode": true,
+        "editor_language": "markdown",
+        "default": "你是严格的社区审核助手。请审查帖子正文与图片中的文字、二维码、交易、外挂、引流、联系方式等违规内容。输出 JSON 数组，每项包含 feed_id、risk_level、reason。risk_level 只允许 low、medium、high。"
+      },
+      "timeout_seconds": {
+        "type": "int",
+        "description": "AI 审核超时时间",
+        "hint": "模型响应较慢时可以适当调大，图片审核模式通常需要更长时间。",
+        "default": 90
+      },
+      "max_images_per_feed": {
+        "type": "int",
+        "description": "每帖最多送审图片数",
+        "hint": "只有 image_review_mode=img 时生效，用于限制每条帖子最多附带多少张图送审。",
+        "default": 3
+      },
+      "image_review_mode": {
+        "type": "string",
+        "description": "图片审核模式",
+        "default": "all",
+        "options": [
+          "all",
+          "img"
+        ],
+        "hint": "all 表示全部帖子仅审核文本；img 表示全部帖子同时审核文本与图片。"
+      },
+      "max_content_length": {
+        "type": "int",
+        "description": "每帖送审正文截断长度",
+        "hint": "正文过长会抬高模型成本，这里控制每条帖子最多送多少字符给模型。",
+        "default": 500
+      },
+      "response_format": {
+        "type": "string",
+        "description": "模型输出格式",
+        "hint": "建议保持 feed_objects，这样通知里可以展示 risk_level 和 reason。",
+        "default": "feed_objects",
+        "options": [
+          "feed_id_list",
+          "feed_objects"
+        ]
+      },
+      "strict_mode": {
+        "type": "bool",
+        "description": "是否启用严格审核",
+        "hint": "这是给提示词策略预留的开关，适合在代码或 prompt 中区分严格与宽松审核。",
+        "default": true
+      },
+      "require_reason": {
+        "type": "bool",
+        "description": "是否要求模型返回违规原因",
+        "hint": "建议开启，便于通知里说明命中原因，也便于后续人工复核。",
+        "default": true
+      },
+      "move_risk_levels": {
+        "type": "list",
+        "description": "哪些风险等级执行移动",
+        "hint": "例如只移动 high，保留 medium 仅通知。",
+        "default": [
+          "high"
+        ]
+      }
+    }
   },
-  "schedule_random_offset": {
-    "description": "定时任务随机偏移秒数（0-300）",
-    "type": "int",
-    "default": 0,
-    "hint": "避免定时任务精确整点触发，增加随机延迟"
+  "record": {
+    "type": "object",
+    "description": "去重与状态落盘配置",
+    "items": {
+      "max_records": {
+        "type": "int",
+        "description": "最多保留的已处理记录数",
+        "hint": "用于去重，防止同一帖子被反复审核。",
+        "default": 2000
+      },
+      "record_safe_feeds": {
+        "type": "bool",
+        "description": "正常帖子也记录为已处理",
+        "hint": "建议开启，否则正常帖子可能在后续轮询中被重复审核。",
+        "default": true
+      },
+      "record_failed_move_feeds": {
+        "type": "bool",
+        "description": "移动失败帖子也记录为已处理",
+        "hint": "通常建议关闭，这样移动失败的帖子还能在下一轮继续重试。",
+        "default": false
+      },
+      "retry_on_ai_failure": {
+        "type": "bool",
+        "description": "AI 审核失败时保留待重试",
+        "hint": "建议开启，避免模型临时报错就把整批帖子永久跳过。",
+        "default": true
+      },
+      "store_last_report": {
+        "type": "bool",
+        "description": "保存最近一次巡检报告",
+        "hint": "开启后可以通过命令查看最近一次扫描结果。",
+        "default": true
+      }
+    }
+  },
+  "notify": {
+    "type": "object",
+    "description": "通知配置",
+    "items": {
+      "enabled": {
+        "type": "bool",
+        "description": "是否启用通知",
+        "hint": "关闭后插件仍会巡检，但不会主动向已绑定会话发送结果通知。",
+        "default": true
+      },
+      "notify_only_when_flagged": {
+        "type": "bool",
+        "description": "仅有违规内容时通知",
+        "hint": "开启后，扫描结果为 0 违规时不会刷屏发送完成通知。",
+        "default": true
+      },
+      "notify_include_feed_detail": {
+        "type": "bool",
+        "description": "通知中包含违规帖子详情",
+        "hint": "关闭后通知只保留统计摘要，不展开每条违规帖明细。",
+        "default": true
+      },
+      "notify_include_reason": {
+        "type": "bool",
+        "description": "通知中包含模型判定原因",
+        "hint": "建议开启，便于管理员快速理解为什么命中违规。",
+        "default": true
+      },
+      "notify_max_detail_count": {
+        "type": "int",
+        "description": "单次通知最多展示几条违规明细",
+        "hint": "避免单条通知过长刷屏。",
+        "default": 5
+      },
+      "notify_on_startup_failure": {
+        "type": "bool",
+        "description": "启动自检失败时主动通知",
+        "hint": "适合第一时间发现 CLI 未登录、路径错误、权限异常等问题。",
+        "default": true
+      },
+      "manual_notify_targets": {
+        "type": "list",
+        "description": "高级兜底通知目标列表，建议优先使用绑定命令保存的会话",
+        "hint": "这里填的是 unified_msg_origin，普通使用场景更推荐在目标会话里执行绑定通知命令。",
+        "default": []
+      }
+    }
   }
 }
