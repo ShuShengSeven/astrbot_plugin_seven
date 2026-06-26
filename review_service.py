@@ -256,7 +256,11 @@ class ReviewService:
             feed_id = str(feed.get("feed_id", ""))
             if not feed_id:
                 continue
-            detail = await self.cli.get_feed_detail(self.config.channel.guild_id, feed_id)
+            try:
+                detail = await self.cli.get_feed_detail(self.config.channel.guild_id, feed_id)
+            except CliError as exc:
+                logger.warning("[频道巡检] 获取帖子详情失败，安全跳过: %s | %s", feed_id, exc)
+                continue
             resolved_channel_id = str(
                 detail.get("channel_id")
                 or feed.get("channel_id")
