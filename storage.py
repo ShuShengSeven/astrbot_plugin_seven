@@ -106,6 +106,9 @@ class PluginStorage:
         self.save_notify_targets(filtered)
         return True
 
+    def clear_processed(self) -> None:
+        self._write_json(self.processed_path, [])
+
     def save_last_report(self, report: dict[str, Any]) -> None:
         self._write_json(self.last_report_path, report)
 

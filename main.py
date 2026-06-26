@@ -267,3 +267,15 @@ class ChannelInspectPlugin(Star):
         result = await self.review_service.run_startup_check()
         self.storage.patch_state(startup_check=result)
         yield event.plain_result(f"自检结果：{result}")
+
+    @channel_inspect.command("清空记录")
+    async def clear_records(self, event: AstrMessageEvent, confirm: str = ""):
+        """清空本地已处理帖子记录"""
+        if confirm != "确认":
+            yield event.plain_result(
+                "此操作将清空所有已处理帖子记录，所有帖子将被重新审核。\n"
+                "输入 `频道巡检 清空记录 确认` 以执行。"
+            )
+            return
+        self.storage.clear_processed()
+        yield event.plain_result("已清空所有本地帖子记录。下次巡检将重新审核所有帖子。")
