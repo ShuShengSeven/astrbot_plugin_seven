@@ -46,7 +46,7 @@ class ReviewConfig:
     model: str = ""
     custom_base_url: str = ""
     custom_api_key: str = ""
-    review_prompt: str = ""
+    review_prompt: str = "你是严谨的社区内容审核引擎。进行【意图审查】，不仅识别明显违规词，更要揪出使用谐音/拼音/变体伪装的违规交易与引流行为。输出 JSON 格式审核结果。"
     timeout_seconds: int = 90
     max_images_per_feed: int = 3
     image_review_mode: str = "all"

@@ -233,7 +233,7 @@
         "hint": "这里决定模型如何判定违规内容，建议根据你的社区规则持续迭代。",
         "editor_mode": true,
         "editor_language": "markdown",
-        "default": "你是严格的社区审核助手。请审查帖子正文与图片中的文字、二维码、交易、外挂、引流、联系方式等违规内容。输出 JSON 数组，每项包含 feed_id、risk_level、reason。risk_level 只允许 low、medium、high。"
+        "default": "你是严谨的社区内容审核引擎。进行【意图审查】，不仅识别明显违规词，更要揪出使用谐音/拼音/变体伪装的违规交易与引流行为。输出 JSON 格式审核结果。"
       },
       "timeout_seconds": {
         "type": "int",

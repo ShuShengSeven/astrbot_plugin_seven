@@ -375,13 +375,21 @@ class ReviewService:
                             "type": "object",
                             "properties": {
                                 "feed_id": {"type": "string"},
+                                "step1_visual_analysis": {"type": "string"},
+                                "step2_analysis": {"type": "string"},
                                 "risk_level": {
                                     "type": "string",
                                     "enum": ["low", "medium", "high"],
                                 },
                                 "reason": {"type": "string"},
                             },
-                            "required": ["feed_id", "risk_level", "reason"],
+                            "required": [
+                                "feed_id",
+                                "step1_visual_analysis",
+                                "step2_analysis",
+                                "risk_level",
+                                "reason",
+                            ],
                             "additionalProperties": False,
                         },
                     },
