@@ -292,6 +292,12 @@
         "default": [
           "high"
         ]
+      },
+      "structured_output": {
+        "type": "bool",
+        "description": "启用 OpenAI Structured Outputs（仅 custom_openai_compatible 模式）",
+        "hint": "开启后强制模型输出合法 JSON，消除解析失败。要求 API 支持 json_schema 模式。不支持时自动降级到 json_object 模式。",
+        "default": false
       }
     }
   },

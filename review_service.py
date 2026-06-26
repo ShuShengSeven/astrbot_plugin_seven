@@ -342,11 +342,57 @@ class ReviewService:
 
         return all_findings
 
+    def _build_structured_schema(self) -> dict:
+        if self.config.review.response_format == "feed_id_list":
+            return {
+                "name": "review_result",
+                "strict": True,
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "flagged_feeds": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                        },
+                    },
+                    "required": ["flagged_feeds"],
+                    "additionalProperties": False,
+                },
+            }
+        return {
+            "name": "review_result",
+            "strict": True,
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "findings": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "feed_id": {"type": "string"},
+                                "risk_level": {
+                                    "type": "string",
+                                    "enum": ["low", "medium", "high"],
+                                },
+                                "reason": {"type": "string"},
+                            },
+                            "required": ["feed_id", "risk_level", "reason"],
+                            "additionalProperties": False,
+                        },
+                    },
+                },
+                "required": ["findings"],
+                "additionalProperties": False,
+            },
+        }
+
     async def _review_custom_direct(self, feeds: list[dict[str, Any]]) -> list[ReviewFinding]:
         """
         自定义直连通道：
         1. 绕过 AstrBot Provider 的图片处理链，直接传 URL。
         2. 采用纯文本置顶 + 图片块尾随结构，尽量保持多模态上下文稳定。
+        3. 支持三级降级：json_schema → json_object → 自由文本。
         """
         prompt_text = self.config.review.review_prompt + "\n\n"
         image_blocks: list[dict[str, Any]] = []
@@ -401,6 +447,7 @@ class ReviewService:
             "Authorization": f"Bearer {self.config.review.custom_api_key}",
             "Content-Type": "application/json",
         }
+
         payload = {
             "model": self.config.review.model,
             "messages": [{"role": "user", "content": content_array}],
@@ -408,34 +455,78 @@ class ReviewService:
             "max_tokens": 1500,
         }
 
+        if getattr(self.config.review, "structured_output", False):
+            payload["response_format"] = {
+                "type": "json_schema",
+                "json_schema": self._build_structured_schema(),
+            }
+
         self._debug(
             "review.custom_direct.begin",
             model=self.config.review.model,
             feed_count=len(feeds),
             image_block_count=len(image_blocks),
             prompt_length=len(prompt_text),
+            structured_output=payload.get("response_format"),
         )
 
-        try:
-            timeout = aiohttp.ClientTimeout(total=self.config.review.timeout_seconds)
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.post(
-                    self.config.review.custom_base_url,
-                    headers=headers,
-                    json=payload,
-                ) as response:
-                    if response.status == 413:
-                        logger.warning("[频道巡检] 触发 413 Payload Too Large，目标网关限制了请求体积")
+        for attempt in range(3):
+            try:
+                timeout = aiohttp.ClientTimeout(total=self.config.review.timeout_seconds)
+                async with aiohttp.ClientSession(timeout=timeout) as session:
+                    async with session.post(
+                        self.config.review.custom_base_url,
+                        headers=headers,
+                        json=payload,
+                    ) as response:
 
-                    response.raise_for_status()
-                    data = await response.json()
-                    result_text = data["choices"][0]["message"]["content"]
-                    self._debug("review.custom_direct.response", response_text_preview=result_text[:1200])
-                    return self._parse_findings(result_text)
+                        if response.status == 400 and payload.get("response_format", {}).get("type") == "json_schema":
+                            logger.warning("[频道巡检] API 不支持 strict json_schema，降级为 json_object 模式重试")
+                            payload["response_format"] = {"type": "json_object"}
+                            continue
 
-        except Exception as e:
-            logger.error("[频道巡检] 直连通道请求失败: %s", e)
-            raise e
+                        if response.status == 413:
+                            logger.warning("[频道巡检] 触发 413 Payload Too Large，目标网关限制了请求体积")
+
+                        response.raise_for_status()
+                        data = await response.json()
+
+                        if not data or not isinstance(data, dict):
+                            logger.error("[频道巡检] API 返回非字典数据: %s", data)
+                            return []
+
+                        choices = data.get("choices")
+                        if not choices or not isinstance(choices, list) or len(choices) == 0:
+                            logger.error("[频道巡检] API 响应缺失 choices (可能被限流/管控): %s", data)
+                            return []
+
+                        content_str = choices[0].get("message", {}).get("content")
+                        if not content_str:
+                            return []
+
+                        self._debug("review.custom_direct.response", response_text_preview=content_str[:1200])
+
+                        if payload.get("response_format"):
+                            try:
+                                raw = json.loads(content_str)
+                                items = None
+                                if isinstance(raw, dict):
+                                    items = raw.get("findings") if self.config.review.response_format == "feed_objects" else raw.get("flagged_feeds")
+                                return self._normalize_findings(items if items is not None else raw)
+                            except json.JSONDecodeError:
+                                logger.warning("[频道巡检] JSON 解析失败，使用 fallback 解析器")
+                                return self._parse_findings(content_str)
+
+                        return self._parse_findings(content_str)
+
+            except aiohttp.ClientResponseError as e:
+                logger.error("[频道巡检] 直连通道 HTTP 异常: %s %s", e.status, e.message)
+                raise e
+            except Exception as e:
+                logger.error("[频道巡检] 直连通道请求失败: %s", e)
+                raise e
+
+        return []
 
     async def _review_with_astrbot_provider(self, feeds: list[dict[str, Any]]) -> list[ReviewFinding]:
         provider = self.context.get_provider_by_id(provider_id=self.config.review.provider_id)

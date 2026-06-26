@@ -55,6 +55,7 @@ class ReviewConfig:
     strict_mode: bool = True
     require_reason: bool = True
     move_risk_levels: list[str] = field(default_factory=lambda: ["high"])
+    structured_output: bool = False
 
 
 @dataclass
