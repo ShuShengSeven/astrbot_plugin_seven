@@ -30,9 +30,9 @@
       },
       "fetch_count": {
         "type": "int",
-        "description": "每轮拉取帖子数量",
+        "description": "每轮自动巡检拉取帖子数量",
         "default": 20,
-        "hint": "插件会强制限制为最多 20 条，避免多图帖子导致模型请求体过大。"
+        "hint": "注意不要低于 1，自动巡检受上限 20 条保护。"
       },
       "dry_run": {
         "type": "bool",
@@ -298,6 +298,18 @@
         "description": "启用 OpenAI Structured Outputs（仅 custom_openai_compatible 模式）",
         "hint": "开启后强制模型输出合法 JSON，消除解析失败。要求 API 支持 json_schema 模式。不支持时自动降级到 json_object 模式。",
         "default": false
+      }
+    }
+  },
+  "manual_review": {
+    "type": "object",
+    "description": "手动触发巡检配置",
+    "items": {
+      "fetch_count": {
+        "type": "int",
+        "description": "手动触发时每轮拉取帖子数量",
+        "hint": "压力测试可调至 200 甚至更多。数量越多耗时越久，注意 API 限流。",
+        "default": 20
       }
     }
   },

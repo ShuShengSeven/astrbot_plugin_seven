@@ -71,7 +71,11 @@ class ReviewService:
             dry_run=self.config.auto_review.dry_run,
             image_review_mode=self.config.review.image_review_mode,
         )
-        candidates = await self._fetch_candidate_feeds()
+        if trigger == "manual":
+            fetch_count = max(1, self.config.manual_review.fetch_count)
+        else:
+            fetch_count = max(1, min(self.config.auto_review.fetch_count, 20))
+        candidates = await self._fetch_candidate_feeds(fetch_count)
         processed_ids = self.storage.get_processed_ids()
         new_feeds = [feed for feed in candidates if str(feed.get("feed_id", "")) not in processed_ids]
         skipped_processed = [
@@ -185,9 +189,9 @@ class ReviewService:
         self._debug("scan_once.done", trigger=trigger, report=report)
         return report
 
-    async def _fetch_candidate_feeds(self) -> list[dict[str, Any]]:
+    async def _fetch_candidate_feeds(self, count: int = 20) -> list[dict[str, Any]]:
         channel_cfg = self.config.channel
-        count = max(1, min(self.config.auto_review.fetch_count, 20))
+        count = max(1, count)
         self._debug(
             "fetch_candidates.begin",
             guild_id=channel_cfg.guild_id,

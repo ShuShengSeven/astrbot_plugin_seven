@@ -59,6 +59,11 @@ class ReviewConfig:
 
 
 @dataclass
+class ManualReviewConfig:
+    fetch_count: int = 20
+
+
+@dataclass
 class RecordConfig:
     max_records: int = 2000
     record_safe_feeds: bool = True
@@ -86,6 +91,7 @@ class PluginConfigModel:
     cli: CliConfig = field(default_factory=CliConfig)
     channel: ChannelConfig = field(default_factory=ChannelConfig)
     review: ReviewConfig = field(default_factory=ReviewConfig)
+    manual_review: ManualReviewConfig = field(default_factory=ManualReviewConfig)
     record: RecordConfig = field(default_factory=RecordConfig)
     notify: NotifyConfig = field(default_factory=NotifyConfig)
 
@@ -99,6 +105,7 @@ class PluginConfigModel:
             cli=CliConfig(**(raw.get("cli") or {})),
             channel=ChannelConfig(**(raw.get("channel") or {})),
             review=ReviewConfig(**(raw.get("review") or {})),
+            manual_review=ManualReviewConfig(**(raw.get("manual_review") or {})),
             record=RecordConfig(**(raw.get("record") or {})),
             notify=NotifyConfig(**(raw.get("notify") or {})),
         )
@@ -125,6 +132,8 @@ class PluginConfigModel:
             errors.append("auto_review.poll_interval_seconds 不能低于 60 秒。")
         if not 1 <= self.auto_review.fetch_count <= 20:
             errors.append("auto_review.fetch_count 必须在 1 到 20 之间。")
+        if self.manual_review.fetch_count < 1:
+            errors.append("manual_review.fetch_count 不能低于 1。")
         if not 0 <= self.review.max_images_per_feed <= 5:
             errors.append("review.max_images_per_feed 必须在 0 到 5 之间。")
         if self.review.image_review_mode not in {"all", "img"}:
